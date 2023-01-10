@@ -1,9 +1,8 @@
-.classpath
-.project
 .settings/
+.project
+.classpath
 target/
-crash-*
-crash-*
+LangPack
+LangPack-report.txt
 crash-*
 Crash_*.java
-LangPack
