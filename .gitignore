@@ -1,0 +1,9 @@
+.classpath
+.project
+.settings/
+target/
+crash-*
+crash-*
+crash-*
+Crash_*.java
+LangPack
