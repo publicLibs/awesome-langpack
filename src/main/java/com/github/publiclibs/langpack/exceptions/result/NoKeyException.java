@@ -1,4 +1,4 @@
-package com.github.publiclibs.langpack.exceptions;
+package com.github.publiclibs.langpack.exceptions.result;
 
 public class NoKeyException extends RuntimeException {
 

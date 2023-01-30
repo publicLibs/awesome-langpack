@@ -8,10 +8,11 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-import com.github.publiclibs.langpack.exceptions.LangPackException;
-import com.github.publiclibs.langpack.exceptions.NoDataException;
+import com.github.publiclibs.langpack.exceptions.input.InputLangPackException;
+import com.github.publiclibs.langpack.exceptions.result.NoDataException;
 import com.github.publiclibs.langpack.provider.LangProviderInterface;
 import com.github.publiclibs.langpack.provider.file.DefaultLangProvider;
+import com.github.publiclibs.langpack.provider.file.JarResourcesLangProvider;
 
 /**
  * Предоставляет текст по ключу для определенного языка
@@ -28,26 +29,26 @@ public final class Langpack {
 
 	private static final String JVMLANG = Locale.getDefault().getLanguage();
 
-	private static final String FALLBACK = "en";
+	private static String FALLBACK = "en";
 
 	public static String getData(final String key) {
 		return getInstance().getDataPriv(key);
 	}
 
 	public static String getData(final String key, final String lang) {
-
-		if (key == null || key.isEmpty()) {
-			throw new LangPackException(key, lang);
-		}
-		if (lang == null || lang.isEmpty()) {
-			throw new LangPackException(key, lang);
-		}
-
 		return getInstance().getDataPriv(key, lang);
 	}
 
 	public static Langpack getInstance() {
 		return instance;
+	}
+
+	/**
+	 * @param fALLBACK the fALLBACK to set
+	 */
+	public static void setFALLBACK(final String nameFallBackLang) {
+		InputLangPackException.checkString("nameFallBackLang", nameFallBackLang);
+		FALLBACK = nameFallBackLang;
 	}
 
 	private final CopyOnWriteArrayList<LangProviderInterface> providers = new CopyOnWriteArrayList<>();
@@ -56,28 +57,28 @@ public final class Langpack {
 	}
 
 	private String getDataPriv(final String key) {
-		try {
-			final var data = getDataPriv(key, JVMLANG);
-			if (data != null) {
-				return data;
-			}
-		} catch (final Exception e) {
-			e.printStackTrace();
+		final String data = getDataPriv(key, JVMLANG);
+		if (data != null) {
+			return data;
 		}
 		return getDataPriv(key, FALLBACK);
 	}
 
 	private String getDataPriv(final String key, final String lang) {
+		InputLangPackException.checkString("key", key);
+		InputLangPackException.checkString("lang", lang);
 		if (providers.isEmpty()) {
 			try {
 				registerPrivider(new DefaultLangProvider());
+				registerPrivider(new JarResourcesLangProvider());
 			} catch (final IOException e) {
 				e.printStackTrace();
 			}
 		}
 
-		final var ok = providers.parallelStream().map((final var provider) -> provider.getData(key, lang))
-				.filter(Optional::isPresent).map(Optional::get).findFirst();
+		final Optional<String> ok = providers.parallelStream()
+				.map((final LangProviderInterface provider) -> provider.getData(key, lang)).filter(Optional::isPresent)
+				.map(Optional::get).findFirst();
 		if (ok.isPresent()) {
 			return ok.get();
 		}

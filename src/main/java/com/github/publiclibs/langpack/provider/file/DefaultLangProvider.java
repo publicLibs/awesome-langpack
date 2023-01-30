@@ -10,36 +10,40 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.github.publiclibs.langpack.exceptions.LangPackException;
-import com.github.publiclibs.langpack.exceptions.NoDataException;
-import com.github.publiclibs.langpack.exceptions.NoKeyException;
-import com.github.publiclibs.langpack.exceptions.NoLangException;
+import com.github.publiclibs.langpack.exceptions.input.InputLangPackException;
+import com.github.publiclibs.langpack.exceptions.input.NullContainsArgumentLangException;
+import com.github.publiclibs.langpack.exceptions.input.argument.InvalidArgumentLangPackException;
+import com.github.publiclibs.langpack.exceptions.result.NoDataException;
+import com.github.publiclibs.langpack.exceptions.result.NoKeyException;
+import com.github.publiclibs.langpack.exceptions.result.NoLangException;
 import com.github.publiclibs.langpack.provider.LangProvider;
+import com.github.publiclibs.langpack.provider.ProviderUtils;
 
 /**
- * @author user_dev_new
  *
+ * @author freedom1b2830
+ * @date 2023-января-12 03:18:21
  */
 public class DefaultLangProvider extends LangProvider {
 
 	public static final Path DEFAULTPROVIDER_PATH = Paths.get("defaultLangProviderDir");
 
 	/**
-	 * @param file
+	 *
+	 * @param path
 	 * @throws IOException
 	 */
 	private static void fixFile(Path path) throws IOException {
-
-		if (path == null) {
-			throw new LangPackException(null, null);
-		}
+		InputLangPackException.checkString("path", path.toString());
 		path = path.normalize();
 
 		if (!Files.exists(path)) {
-			final var parentFile = path.getParent();
+			final Path parentFile = path.getParent();
 			if (parentFile != null) {
 				Files.createDirectories(parentFile);
 			}
@@ -47,36 +51,27 @@ public class DefaultLangProvider extends LangProvider {
 		}
 	}
 
-	/**
-	 * @param string
-	 * @param line
-	 */
-	public static void logWrong(final String string, final String line) {
-		System.err.println(String.format("wrong %s for %s", string, line));
-	}
+	public static String sanitizeFilePath(final String name) {
+		if (name == null || name.isEmpty()) {
+			throw new InvalidArgumentLangPackException(new String[] { "name" });
+		}
 
-	public static String sanitizeFilePath(String name) {
-		if (name == null) {
-			throw new LangPackException("#FILENAME", name);
-		}
 		if (name.contains(File.separator)) {
-			throw new LangPackException("#FILENAME", name);
+			throw new LangPackException("#FILENAME-path-trav-separator", name);
 		}
-		name = name.replaceAll("[.]{2}", "");
-		if (name.isEmpty()) {
-			throw new LangPackException("#FILENAME", name);
+		if (name.contains("..")) {
+			throw new LangPackException("#FILENAME-path-trav-dot", name);
 		}
+
 		for (final char symbol : name.toCharArray()) {
 			if (symbol == '\u0000') {
-				throw new LangPackException("#FILENAME null ", name);
+				throw new NullContainsArgumentLangException(new String[] { "name" });
 			}
-			final var symbolStr = Character.toString(symbol);
-			if (!symbolStr.matches("[-.a-zA-Z_0-9]+")) {
-				throw new LangPackException("#FILENAME matches ", name);
+			if (!Character.toString(symbol).matches("[-.a-zA-Z_0-9]+")) {
+				throw new InvalidArgumentLangPackException(new String[] { "name" });
 			}
 		}
 		return name;
-
 	}
 
 	// key->lang:value
@@ -87,7 +82,7 @@ public class DefaultLangProvider extends LangProvider {
 	private final Path reportFile = Paths.get("LangPack-report.txt");
 
 	public DefaultLangProvider() throws IOException {
-		inputFile = Paths.get("LangPack");
+		inputFile = Paths.get(sanitizeFilePath("LangPack"));
 		fixFile(inputFile);
 	}
 
@@ -98,16 +93,30 @@ public class DefaultLangProvider extends LangProvider {
 		fixFile(inputFile);
 	}
 
+	public @Override boolean equals(final Object obj) {
+		if (this == obj) {
+			return true;
+		}
+		if (obj == null) {
+			return false;
+		}
+		if (getClass() != obj.getClass()) {
+			return false;
+		}
+		final DefaultLangProvider other = (DefaultLangProvider) obj;
+		return Objects.equals(inputFile, other.inputFile);
+	}
+
 	public @Override Optional<String> getData(final String key, final String lang) {
 		try {
 			if (!data.containsKey(key)) {
 				throw new NoKeyException(key);
 			}
-			final var langs = data.get(key);
+			final ConcurrentHashMap<String, String> langs = data.get(key);
 			if (langs == null || langs.isEmpty()) {
 				throw new NoLangException(key, lang);
 			}
-			final var value = langs.get(lang);
+			final String value = langs.get(lang);
 			if (value == null) {
 				throw new NoDataException(key, lang);
 			}
@@ -119,31 +128,16 @@ public class DefaultLangProvider extends LangProvider {
 		return Optional.empty();
 	}
 
+	@Override
+	public int hashCode() {
+		return Objects.hash(inputFile);
+	}
+
 	public @Override void init() {
 		try {
-			Files.readAllLines(inputFile, StandardCharsets.UTF_8).stream().filter(line -> {
-				return !line.isEmpty() && line.contains("=");
-			}).forEachOrdered((final String line) -> {
-				final var pairs = line.split("=", 3);
-				final var key = pairs[0];
-				if (key == null || key.isEmpty()) {
-					logWrong("key", line);
-					return;
-				}
-				final var lang = pairs[1];
-				if (lang == null || lang.isEmpty()) {
-					logWrong("lang", line);
-					return;
-				}
-				final var val = pairs[2];
-				if (val == null || val.isEmpty()) {
-					logWrong("val", line);
-					return;
-				}
-				final var langs = data.computeIfAbsent(key, t1 -> new ConcurrentHashMap<>());
-				langs.putIfAbsent(lang, val);
-			});
-
+			Files.readAllLines(inputFile, StandardCharsets.UTF_8).stream()
+					.filter((final String line) -> !line.isEmpty() && line.contains("="))
+					.forEachOrdered((final String line) -> ProviderUtils.parseLine(data, line));
 		} catch (final IOException e) {
 			e.printStackTrace();
 		}
@@ -154,8 +148,8 @@ public class DefaultLangProvider extends LangProvider {
 			if (!Files.exists(reportFile)) {
 				Files.createFile(reportFile);
 			}
-			final var dataMSG = String.format("%s=%s=VALUE%n", key, lang);
-			Files.writeString(reportFile, dataMSG, StandardOpenOption.APPEND);
+			final String dataMSG = String.format("%s=%s=VALUE%n", key, lang) + "\n";
+			Files.write(reportFile, dataMSG.getBytes(StandardCharsets.UTF_8), StandardOpenOption.APPEND);
 		} catch (final IOException e) {
 			e.printStackTrace();
 		}

@@ -1,0 +1,1 @@
+LANGPACK_HELP=en=The awesove-langPack project was created in order to simplify writing software where the developer needs to provide textual information for native speakers of different languages. Without rewriting the code for a new localization, but only specifying what information (specify the key) and the user's language.

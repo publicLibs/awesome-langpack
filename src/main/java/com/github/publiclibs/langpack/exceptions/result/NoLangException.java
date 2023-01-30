@@ -1,7 +1,9 @@
 /**
  *
  */
-package com.github.publiclibs.langpack.exceptions;
+package com.github.publiclibs.langpack.exceptions.result;
+
+import com.github.publiclibs.langpack.exceptions.LangPackException;
 
 /**
  * @author user_dev_new
