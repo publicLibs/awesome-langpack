@@ -29,7 +29,7 @@ public class InputLangPackException extends LangPackException {
 				throw new InvalidLangCodeLangPackException(new String[] { "WTTTF" });
 			}
 		}
-		if (!argument.matches("[a-zA-Z_0-9]{3,}")) {
+		if (!argument.matches("[a-zA-Z_0-9]{2,}")) {
 			if (argName.equalsIgnoreCase("key")) {
 				throw new InvalidKeyLangPackException(new String[] { "key" });
 			}
